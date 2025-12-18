@@ -1,0 +1,28 @@
+# FAFO Website - Git Ignore File
+# Prevents sensitive files from being committed to version control
+
+# API Keys Configuration
+chatbot-config.js
+backend/.env
+
+# Node modules
+backend/node_modules/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+backend/logs/

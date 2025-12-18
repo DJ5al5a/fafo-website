@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAFO Chatbot Test</title>
+    <link rel="stylesheet" href="chatbot-styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .test-info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .test-list {
+            list-style: none;
+            padding: 0;
+        }
+        .test-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-left: 3px solid #3498db;
+            padding-left: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>FAFO Chatbot Test Page</h1>
+
+    <div class="test-info">
+        <h2>Test Checklist:</h2>
+        <ul class="test-list">
+            <li>✓ Settings gear icon should NOT be visible in chatbot header</li>
+            <li>✓ Only Minimize and Close buttons should appear</li>
+            <li>✓ Suggested prompts should disappear after clicking one</li>
+            <li>✓ Gemini API key should auto-load from config</li>
+            <li>✓ Chatbot should send and receive messages</li>
+            <li>✓ No OpenRouter references in console logs</li>
+        </ul>
+    </div>
+
+    <p><strong>Instructions:</strong></p>
+    <ol>
+        <li>Open browser console (F12)</li>
+        <li>Click the "Ask FAFO Assistant" button in bottom right</li>
+        <li>Check console for: "✓ Gemini API key loaded from config"</li>
+        <li>Verify header only has Minimize and Close buttons (no settings gear)</li>
+        <li>Click a suggested prompt button</li>
+        <li>Verify suggested prompts disappear after sending message</li>
+        <li>Wait for chatbot response from Gemini API</li>
+        <li>Check console for any errors</li>
+    </ol>
+
+    <!-- Load chatbot scripts in correct order -->
+    <script src="chatbot-config.js"></script>
+    <script src="chatbot-worker.js"></script>
+    <script src="chatbot.js"></script>
+</body>
+</html>

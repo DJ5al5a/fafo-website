@@ -26,3 +26,9 @@ Thumbs.db
 # Logs
 *.log
 backend/logs/
+
+# Documentation files (except README)
+*.md
+!README.md
+!backend/README.md
+.claude/

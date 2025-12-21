@@ -85,6 +85,24 @@
     font-size: 1.25rem;
 }
 
+/* Skip to main content link (accessibility) */
+.skip-to-main {
+    position: absolute;
+    left: -9999px;
+    z-index: 999;
+    padding: 1rem 1.5rem;
+    background-color: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+    border-radius: 0 0 4px 0;
+}
+
+.skip-to-main:focus {
+    left: 0;
+    top: 0;
+}
+
 html {
     scroll-behavior: smooth;
 }
@@ -865,5 +883,70 @@ body {
     .btn-large {
         width: 100%;
         text-align: center;
+    }
+}
+
+/* ============================================
+   PRINT STYLES - Force light mode for printing
+   ============================================ */
+@media print {
+    /* Override dark mode variables for printing */
+    :root,
+    [data-theme="dark"] {
+        --primary-color: #1e3a8a;
+        --secondary-color: #b8860b;
+        --text-dark: #1f2937;
+        --text-light: #6b7280;
+        --bg-light: #ffffff;
+        --bg-white: #ffffff;
+        --bg-pattern: #ffffff;
+        --border-color: #e2e8f0;
+        --footer-bg: #ffffff;
+        --footer-text: #1f2937;
+        --footer-text-dim: #6b7280;
+    }
+
+    /* Force light backgrounds and dark text */
+    body {
+        background: white !important;
+        color: black !important;
+    }
+
+    /* Hide navigation, footer, and non-essential elements */
+    header,
+    footer,
+    .theme-toggle,
+    .nav-toggle,
+    .btn-primary,
+    .hero-buttons {
+        display: none !important;
+    }
+
+    /* Ensure all text is readable */
+    * {
+        color: black !important;
+        background: white !important;
+    }
+
+    /* Keep borders visible but light */
+    .accordion-item,
+    .resource-card,
+    .content-box {
+        border: 1px solid #ccc !important;
+    }
+
+    /* Remove shadows for cleaner printing */
+    * {
+        box-shadow: none !important;
+    }
+
+    /* Optimize page breaks */
+    .accordion-item,
+    .resource-card {
+        page-break-inside: avoid;
+    }
+
+    h2, h3 {
+        page-break-after: avoid;
     }
 }

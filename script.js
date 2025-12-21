@@ -18,22 +18,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Accordion functionality
+    // Accordion functionality with ARIA attributes
     const accordionHeaders = document.querySelectorAll('.accordion-header');
 
-    accordionHeaders.forEach(header => {
+    accordionHeaders.forEach((header, index) => {
+        // Add ARIA attributes for accessibility
+        const accordionItem = header.parentElement;
+        const accordionContent = accordionItem.querySelector('.accordion-content');
+
+        // Generate unique IDs
+        const headerId = `accordion-header-${index}`;
+        const contentId = `accordion-content-${index}`;
+
+        header.setAttribute('id', headerId);
+        header.setAttribute('aria-expanded', 'false');
+        header.setAttribute('aria-controls', contentId);
+
+        accordionContent.setAttribute('id', contentId);
+        accordionContent.setAttribute('role', 'region');
+        accordionContent.setAttribute('aria-labelledby', headerId);
+
         header.addEventListener('click', function() {
-            const accordionItem = this.parentElement;
             const wasActive = accordionItem.classList.contains('active');
 
             // Close all accordion items
             document.querySelectorAll('.accordion-item').forEach(item => {
                 item.classList.remove('active');
+                const btn = item.querySelector('.accordion-header');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
             });
 
             // Open clicked item if it wasn't active
             if (!wasActive) {
                 accordionItem.classList.add('active');
+                this.setAttribute('aria-expanded', 'true');
             }
         });
     });
@@ -55,7 +73,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Google Forms is embedded - no custom form handling needed
 
     // Set active nav link based on current page
     const currentLocation = window.location.pathname.split('/').pop() || 'index.html';
@@ -98,4 +115,12 @@ document.addEventListener('DOMContentLoaded', function() {
             themeToggle.innerHTML = `${icon} ${text}`;
         }
     }
+
+    // Print button functionality for templates page
+    const printButtons = document.querySelectorAll('.print-btn');
+    printButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            window.print();
+        });
+    });
 });

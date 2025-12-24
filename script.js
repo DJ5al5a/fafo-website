@@ -123,4 +123,32 @@ document.addEventListener('DOMContentLoaded', function() {
             window.print();
         });
     });
+
+    // Preview button functionality for templates page
+    const previewLinks = document.querySelectorAll('a[href^="#"][href*="-preview"]');
+    const templatePreviewsSection = document.getElementById('template-previews');
+
+    previewLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // Show the template previews section
+            if (templatePreviewsSection) {
+                templatePreviewsSection.style.display = 'block';
+            }
+
+            // Scroll to the specific preview
+            const targetId = this.getAttribute('href');
+            const targetElement = document.querySelector(targetId);
+
+            if (targetElement) {
+                setTimeout(() => {
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }, 100);
+            }
+        });
+    });
 });

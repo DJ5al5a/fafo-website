@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Court Hearing Notes - FAFO</title>
+    <style>
+        @media print {
+            .no-print { display: none; }
+            body { margin: 0; padding: 20px; }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .header {
+            border-bottom: 3px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .field {
+            margin: 15px 0;
+        }
+        .field label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .field input[type="text"], .field textarea {
+            width: 100%;
+            border: none;
+            border-bottom: 1px solid #333;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+        .field textarea {
+            min-height: 100px;
+            border: 1px solid #333;
+            padding: 10px;
+        }
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 2px solid #856404;
+            padding: 15px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .important {
+            background: #f8d7da;
+            border: 2px solid #721c24;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .btn {
+            background: #1e3a8a;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px 10px 0;
+        }
+        .btn:hover {
+            background: #153e75;
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="btn" onclick="window.print()">Print This Form</button>
+        <button class="btn" onclick="window.close()">Close</button>
+    </div>
+
+    <div class="warning no-print">
+        <strong>BRING THIS TO COURT</strong> - Take notes while you're there. Write down EXACTLY what the judge says.
+    </div>
+
+    <div class="important no-print">
+        <strong>IMPORTANT:</strong> This is for YOUR notes only. Your lawyer will file the official court documents. Don't submit this to the court.
+    </div>
+
+    <div class="header">
+        <h1 style="margin: 0;">COURT HEARING NOTES</h1>
+        <p style="margin: 5px 0 0 0; color: #666;">Take notes during your court hearing</p>
+    </div>
+
+    <div class="field">
+        <label>Your Name:</label>
+        <input type="text" name="your-name">
+    </div>
+
+    <div class="field">
+        <label>Case Number:</label>
+        <input type="text" name="case-number">
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <div class="field">
+        <label>When was the hearing?</label>
+        <div style="display: flex; gap: 20px;">
+            <div>Date: <input type="text" placeholder="__/__/20__" style="width: 120px;"></div>
+            <div>Time: <input type="text" placeholder="__:__" style="width: 80px;"></div>
+        </div>
+    </div>
+
+    <div class="field">
+        <label>What kind of hearing was it?</label>
+        <div class="checkbox-group">
+            <label><input type="checkbox"> Shelter Hearing</label>
+            <label><input type="checkbox"> Arraignment</label>
+            <label><input type="checkbox"> Adjudicatory</label>
+            <label><input type="checkbox"> Disposition</label>
+            <label><input type="checkbox"> Judicial Review</label>
+            <label><input type="checkbox"> TPR (Termination)</label>
+        </div>
+        <div style="margin-top: 10px;">
+            Other: <input type="text" style="width: 300px;">
+        </div>
+    </div>
+
+    <div class="field">
+        <label>Judge's name:</label>
+        <input type="text" name="judge">
+    </div>
+
+    <div class="field">
+        <label>My lawyer's name:</label>
+        <input type="text" name="my-attorney">
+    </div>
+
+    <div class="field">
+        <label>DCF's lawyer:</label>
+        <input type="text" name="dcf-attorney">
+    </div>
+
+    <div class="field">
+        <label>Who else was there:</label>
+        <input type="text" name="others" placeholder="Guardian ad litem, other family members, etc.">
+    </div>
+
+    <div class="field">
+        <label>Who talked in court? What did they say?</label>
+        <textarea name="who-spoke" style="min-height: 120px;"></textarea>
+    </div>
+
+    <div class="field">
+        <label style="color: #721c24;">⚠️ What did the judge ORDER? (Write EXACTLY what the judge said)</label>
+        <textarea name="judge-ordered" style="min-height: 150px; border: 2px solid #721c24;"></textarea>
+    </div>
+
+    <div class="field">
+        <label>Next court date:</label>
+        <div style="display: flex; gap: 20px;">
+            <div>Date: <input type="text" placeholder="__/__/20__" style="width: 120px;"></div>
+            <div>Time: <input type="text" placeholder="__:__" style="width: 80px;"></div>
+        </div>
+    </div>
+
+    <div class="field">
+        <label>What do I have to do before the next hearing?</label>
+        <div style="margin-top: 10px;">
+            <div><input type="checkbox" style="width: auto; display: inline; margin-right: 10px;"> <input type="text" style="width: 90%;"></div>
+            <div style="margin-top: 8px;"><input type="checkbox" style="width: auto; display: inline; margin-right: 10px;"> <input type="text" style="width: 90%;"></div>
+            <div style="margin-top: 8px;"><input type="checkbox" style="width: auto; display: inline; margin-right: 10px;"> <input type="text" style="width: 90%;"></div>
+            <div style="margin-top: 8px;"><input type="checkbox" style="width: auto; display: inline; margin-right: 10px;"> <input type="text" style="width: 90%;"></div>
+        </div>
+    </div>
+
+    <div class="field">
+        <label>Questions I need to ask my lawyer:</label>
+        <textarea name="questions"></textarea>
+    </div>
+
+    <div class="field">
+        <label>Other notes or things I'm confused about:</label>
+        <textarea name="notes"></textarea>
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <p style="font-size: 12px; color: #666;">
+        <strong>Why take notes?</strong> Court goes fast and you'll forget what was said. These notes help you remember
+        what the judge ordered and what you need to do. Talk to your lawyer if you didn't understand something.
+    </p>
+
+    <p style="font-size: 12px; color: #666; text-align: center; margin-top: 40px;">
+        FAFO - Friends and Family Outreach | familyandfriendoutreach.com
+    </p>
+</body>
+</html>

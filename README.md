@@ -65,21 +65,6 @@ This website contains the following pages:
 - **script.js** - Navigation, accordion, and form functionality
 - **README.md** - This file
 
-## How to Use This Website
-
-### Viewing Locally
-
-1. Open `index.html` in any web browser
-2. All navigation links will work locally
-3. The contact form is client-side only (you'll need to set up backend processing)
-
-### Deploying to a Web Server
-
-1. Upload all files to your web hosting service
-2. Ensure all files maintain their structure in the same directory
-3. Set up form submission handler for contact.html (currently shows alert only)
-4. Point your domain to the hosting location
-
 ## Key Features
 
 ### Responsive Design
@@ -120,37 +105,6 @@ All information is based on:
 - Constitutional law precedents
 - Official government sources
 
-### Updates Needed
-Laws and policies change. Review and update content annually or when significant legal changes occur.
-
-## Content Sources
-
-All content is researched from official sources:
-- Florida Statutes (flsenate.gov)
-- Florida Courts (flcourts.gov)
-- Florida DCF (myflfamilies.com)
-- U.S. Department of Justice
-- U.S. Department of Health and Human Services
-- American Bar Association
-- Legal aid organizations
-
-## Contact Form Setup
-
-The contact form currently uses JavaScript to show an alert. To make it functional:
-
-1. **Option 1: Email Service**
-   - Use a service like Formspree, EmailJS, or SendGrid
-   - Update form action in contact.html
-
-2. **Option 2: Backend Server**
-   - Set up PHP, Node.js, or Python backend
-   - Configure email sending
-   - Update form submission handler
-
-3. **Option 3: Static Form Service**
-   - Use Netlify Forms, FormSubmit, or similar
-   - Follow service documentation
-
 ## Browser Compatibility
 
 This website works on:
@@ -158,13 +112,6 @@ This website works on:
 - Firefox (latest)
 - Safari (latest)
 - Mobile browsers (iOS Safari, Chrome Mobile)
-
-## File Sizes
-
-Total website size: ~172KB (very lightweight)
-- HTML pages: ~125KB total
-- CSS: 13KB
-- JavaScript: 3KB
 
 ## Maintenance
 

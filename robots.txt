@@ -1,0 +1,15 @@
+# robots.txt for familyandfriendoutreach.com
+# FAFO (Friends and Family Outreach) - Florida child welfare advocacy
+
+# Allow all search engines to crawl all content
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://familyandfriendoutreach.com/sitemap.xml
+
+# Crawl delay (be respectful to server)
+Crawl-delay: 1
+
+# Disallow chatbot test page (not for production)
+Disallow: /chatbot-test.html

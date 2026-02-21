@@ -1,0 +1,224 @@
+{
+  "name": "FAFO Law Monitor (Weekly) - AI Enhanced",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Schedule: Monday 6 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  source_type,\n  source_id,\n  title,\n  url,\n  content_hash,\n  last_checked,\n  target_page,\n  target_section,\n  priority\nFROM fafo_law_sources\nWHERE active = true\nORDER BY priority DESC, id ASC;"
+      },
+      "name": "Get Active Law Sources",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Fetch Law Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const crypto = require('crypto');\n\nconst html = $input.item.json.data || $input.item.json.body || '';\nconst sourceId = $input.item.json.source_id;\nconst sourceDbId = $input.item.json.id;\nconst oldHash = $input.item.json.content_hash || '';\n\n// Clean HTML for consistent hashing\nconst cleanHtml = html\n  .replace(/\\s+/g, ' ')  // Normalize whitespace\n  .replace(/<!--.*?-->/g, '')  // Remove comments\n  .trim();\n\n// Calculate SHA-256 hash\nconst newHash = crypto\n  .createHash('sha256')\n  .update(cleanHtml)\n  .digest('hex');\n\n// Detect change\nconst hasChanged = oldHash && newHash !== oldHash;\n\nreturn {\n  json: {\n    sourceDbId,\n    sourceId,\n    source_type: $input.item.json.source_type,\n    title: $input.item.json.title,\n    url: $input.item.json.url,\n    target_page: $input.item.json.target_page,\n    target_section: $input.item.json.target_section,\n    oldHash,\n    newHash,\n    hasChanged,\n    oldContent: oldHash ? 'Previous version content' : '',\n    newContent: cleanHtml.substring(0, 5000),\n    priority: $input.item.json.priority\n  }\n};"
+      },
+      "name": "Calculate Content Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE fafo_law_sources\nSET \n  content_hash = '{{ $json.newHash }}',\n  last_checked = NOW()\nWHERE id = {{ $json.sourceDbId }};"
+      },
+      "name": "Update Last Checked",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasChanged }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check if Changed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO fafo_law_changes (\n  source_id,\n  change_type,\n  old_content_hash,\n  new_content_hash,\n  summary,\n  severity,\n  affected_pages,\n  status\n) VALUES (\n  {{ $json.sourceDbId }},\n  'content_modified',\n  '{{ $json.oldHash }}',\n  '{{ $json.newHash }}',\n  'Law content has been modified. AI analysis in progress...',\n  'unknown',\n  '{\"{{ $json.target_page }}\": true}',\n  'analyzing'\n) RETURNING id;"
+      },
+      "name": "Create Change Record",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1450, 200],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=ssh -p 6969 dad@192.168.1.104 '/volume1/docker/home-it-department/fafo_law_analyzer.sh \"{{ $('Calculate Content Hash').item.json.sourceId }}\" \"{{ $('Calculate Content Hash').item.json.oldContent }}\" \"{{ $('Calculate Content Hash').item.json.newContent }}\"'",
+        "options": {}
+      },
+      "name": "AI Analysis (Grok)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse AI analysis JSON from command output\nconst stdout = $input.item.json.stdout || '';\n\n// Extract JSON from output (remove ANSI colors and log messages)\nconst jsonMatch = stdout.match(/\\{[\\s\\S]*\\}/);\n\nif (!jsonMatch) {\n  throw new Error('No valid JSON found in AI response');\n}\n\nconst analysis = JSON.parse(jsonMatch[0]);\n\nreturn {\n  json: {\n    changeRecordId: $('Create Change Record').item.json.id,\n    sourceId: $('Calculate Content Hash').item.json.sourceId,\n    title: $('Calculate Content Hash').item.json.title,\n    url: $('Calculate Content Hash').item.json.url,\n    targetPage: $('Calculate Content Hash').item.json.target_page,\n    targetSection: $('Calculate Content Hash').item.json.target_section,\n    priority: $('Calculate Content Hash').item.json.priority,\n    analysis: analysis,\n    summary: analysis.summary,\n    severity: analysis.severity,\n    affectedPages: JSON.stringify(analysis.affected_pages),\n    impactAssessment: analysis.impact_assessment,\n    updatedHtml: analysis.updated_html,\n    recommendations: analysis.recommendations\n  }\n};"
+      },
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE fafo_law_changes\nSET \n  summary = {{ $json.summary ? \"'\" + $json.summary.replace(/'/g, \"''\") + \"'\" : \"NULL\" }},\n  severity = '{{ $json.severity }}',\n  affected_pages = '{{ $json.affectedPages }}'::jsonb,\n  impact_assessment = {{ $json.impactAssessment ? \"'\" + $json.impactAssessment.replace(/'/g, \"''\") + \"'\" : \"NULL\" }},\n  updated_html = {{ $json.updatedHtml ? \"'\" + $json.updatedHtml.replace(/'/g, \"''\") + \"'\" : \"NULL\" }},\n  recommendations = {{ $json.recommendations ? \"'\" + $json.recommendations.replace(/'/g, \"''\") + \"'\" : \"NULL\" }},\n  status = 'pending_approval',\n  updated_at = NOW()\nWHERE id = {{ $json.changeRecordId }};"
+      },
+      "name": "Save Analysis (Pending Approval)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [2050, 200],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8272278534",
+        "text": "=🤖 **AI Law Analysis - APPROVAL REQUIRED**\n\n**Source:** {{ $json.title }}\n**Source ID:** {{ $json.sourceId }}\n**Severity:** {{ $json.severity === 'major' ? '🔴 MAJOR' : '🟡 MINOR' }}\n**Change Record ID:** #{{ $json.changeRecordId }}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n📋 **AI Summary:**\n{{ $json.summary }}\n\n🎯 **Impact on Families:**\n{{ $json.impactAssessment }}\n\n📄 **Affected FAFO Pages:**\n{{ $json.analysis.affected_pages.map(p => `- ${p}.html`).join('\\n') }}\n\n💡 **AI Recommendations:**\n{{ $json.recommendations }}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n🔗 **Law Details:**\n- URL: {{ $json.url }}\n- Priority: {{ $json.priority }}/10\n- Target: {{ $json.targetPage }}.html → {{ $json.targetSection }}\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n⚠️ **MANUAL APPROVAL REQUIRED**\n\n{{ $json.severity === 'major' ? '🔴 **CRITICAL:** This is a MAJOR change affecting families\\' rights or procedures!' : '🟡 This is a minor administrative change.' }}\n\n**Before this update is deployed to familyandfriendoutreach.com, YOU must:**\n\n1️⃣ **Review** the law change at the URL above\n2️⃣ **Verify** the AI analysis is accurate\n3️⃣ **Check** the suggested HTML update (if provided)\n4️⃣ **Approve or Deny** this change\n\n**To Approve:**\nReply: `/approve {{ $json.changeRecordId }}`\n\n**To Deny:**\nReply: `/deny {{ $json.changeRecordId }}`\n\n**To View HTML:**\nQuery database: `SELECT updated_html FROM fafo_law_changes WHERE id={{ $json.changeRecordId }};`\n\n━━━━━━━━━━━━━━━━━━━━━━\n\n⏸️ **Status:** PENDING YOUR APPROVAL\n🤖 **AI Agent:** Grok (OpenCode)\n📅 **Detected:** {{ new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }) }} EST\n\n⚠️ **No changes will be made to FAFO website until you approve!**"
+      },
+      "name": "Request Approval (Telegram)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [2250, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "FAFO Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Aggregate all checked sources\nconst sources = $input.all();\nconst totalSources = sources.length;\nconst changedSources = sources.filter(s => s.json.hasChanged).length;\nconst unchangedSources = totalSources - changedSources;\n\nreturn {\n  json: {\n    totalSources,\n    changedSources,\n    unchangedSources,\n    checkTime: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })\n  }\n};"
+      },
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "8272278534",
+        "text": "=✅ **Weekly Law Monitor Complete**\n\n**Checked:** {{ $json.totalSources }} law sources\n**Changes Detected:** {{ $json.changedSources }}\n**Unchanged:** {{ $json.unchangedSources }}\n\n**Check Time:** {{ $json.checkTime }} EST\n\n{{ $json.changedSources > 0 ? '🤖 AI analysis completed for all changes.\\n⚠️ **' + $json.changedSources + ' change(s) awaiting YOUR approval** before deployment to FAFO site!\\n\\nSee approval requests above. Reply with /approve or /deny for each change.' : '✅ All laws unchanged since last check.' }}\n\n**Next Check:** Next Monday at 6 AM EST\n\n**AI Agent:** Grok (OpenCode)\n**Status:** All changes require manual approval before deployment"
+      },
+      "name": "Weekly Summary Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [2250, 400],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "FAFO Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: Monday 6 AM": {
+      "main": [[{"node": "Get Active Law Sources", "type": "main", "index": 0}]]
+    },
+    "Get Active Law Sources": {
+      "main": [[{"node": "Fetch Law Content", "type": "main", "index": 0}]]
+    },
+    "Fetch Law Content": {
+      "main": [[{"node": "Calculate Content Hash", "type": "main", "index": 0}]]
+    },
+    "Calculate Content Hash": {
+      "main": [[{"node": "Update Last Checked", "type": "main", "index": 0}]]
+    },
+    "Update Last Checked": {
+      "main": [[{"node": "Check if Changed", "type": "main", "index": 0}]]
+    },
+    "Check if Changed": {
+      "main": [
+        [{"node": "Create Change Record", "type": "main", "index": 0}],
+        [{"node": "Aggregate Results", "type": "main", "index": 0}]
+      ]
+    },
+    "Create Change Record": {
+      "main": [[
+        {"node": "AI Analysis (Grok)", "type": "main", "index": 0},
+        {"node": "Aggregate Results", "type": "main", "index": 0}
+      ]]
+    },
+    "AI Analysis (Grok)": {
+      "main": [[{"node": "Parse AI Response", "type": "main", "index": 0}]]
+    },
+    "Parse AI Response": {
+      "main": [[{"node": "Save Analysis (Pending Approval)", "type": "main", "index": 0}]]
+    },
+    "Save Analysis (Pending Approval)": {
+      "main": [[{"node": "Request Approval (Telegram)", "type": "main", "index": 0}]]
+    },
+    "Aggregate Results": {
+      "main": [[{"node": "Weekly Summary Notification", "type": "main", "index": 0}]]
+    }
+  }
+}

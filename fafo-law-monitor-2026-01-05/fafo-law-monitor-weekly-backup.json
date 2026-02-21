@@ -1,0 +1,250 @@
+{
+  "name": "FAFO Law Monitor (Weekly)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "name": "Schedule: Monday 6 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  id,\n  source_type,\n  source_id,\n  title,\n  url,\n  content_hash,\n  last_checked,\n  target_page,\n  target_section,\n  priority\nFROM fafo_law_sources\nWHERE active = true\nORDER BY priority DESC, id ASC;"
+      },
+      "name": "Get Active Law Sources",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Fetch Law Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const crypto = require('crypto');\n\nconst html = $input.item.json.data || $input.item.json.body || '';\nconst sourceId = $input.item.json.source_id;\nconst sourceDbId = $input.item.json.id;\nconst oldHash = $input.item.json.content_hash || '';\n\n// Clean HTML for consistent hashing\nconst cleanHtml = html\n  .replace(/\\s+/g, ' ')  // Normalize whitespace\n  .replace(/<!--.*?-->/g, '')  // Remove comments\n  .trim();\n\n// Calculate SHA-256 hash\nconst newHash = crypto\n  .createHash('sha256')\n  .update(cleanHtml)\n  .digest('hex');\n\n// Detect change\nconst hasChanged = oldHash && newHash !== oldHash;\n\nreturn {\n  json: {\n    sourceDbId,\n    sourceId,\n    source_type: $input.item.json.source_type,\n    title: $input.item.json.title,\n    url: $input.item.json.url,\n    target_page: $input.item.json.target_page,\n    target_section: $input.item.json.target_section,\n    oldHash,\n    newHash,\n    hasChanged,\n    content: cleanHtml.substring(0, 5000),  // Store first 5000 chars\n    priority: $input.item.json.priority\n  }\n};"
+      },
+      "name": "Calculate Content Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=UPDATE fafo_law_sources\nSET \n  content_hash = '{{ $json.newHash }}',\n  last_checked = NOW()\nWHERE id = {{ $json.sourceDbId }};"
+      },
+      "name": "Update Last Checked",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 300],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasChanged }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check if Changed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO fafo_law_changes (\n  source_id,\n  change_type,\n  old_content_hash,\n  new_content_hash,\n  summary,\n  severity,\n  affected_pages,\n  status\n) VALUES (\n  {{ $json.sourceDbId }},\n  'content_modified',\n  '{{ $json.oldHash }}',\n  '{{ $json.newHash }}',\n  'Law content has been modified. Awaiting analysis.',\n  'unknown',\n  '{\"{{ $json.target_page }}\": true}',\n  'pending'\n) RETURNING id;"
+      },
+      "name": "Create Change Record",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1450, 200],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_POSTGRES_CREDENTIAL_ID",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8272278534",
+        "text": "=🚨 **Law Change Detected**\n\n**Source:** {{ $('Calculate Content Hash').item.json.title }}\n**Type:** {{ $('Calculate Content Hash').item.json.source_type }}\n**Source ID:** {{ $('Calculate Content Hash').item.json.sourceId }}\n\n**Details:**\n- URL: {{ $('Calculate Content Hash').item.json.url }}\n- Priority: {{ $('Calculate Content Hash').item.json.priority }}/10\n- Affected Page: {{ $('Calculate Content Hash').item.json.target_page }}.html\n- Target Section: {{ $('Calculate Content Hash').item.json.target_section }}\n\n**Change Record:** #{{ $json.id }}\n**Old Hash:** {{ $('Calculate Content Hash').item.json.oldHash.substring(0, 12) }}...\n**New Hash:** {{ $('Calculate Content Hash').item.json.newHash.substring(0, 12) }}...\n\n**Status:** Pending manual review\n\n⚠️ **Next Steps:**\n1. Review law change at URL above\n2. Determine if FAFO content needs update\n3. Use CMS workflow to update affected section\n\n**Auto-Analysis (Future):** OpenCode AI will analyze changes automatically."
+      },
+      "name": "Notify Law Change",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [1650, 200],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "FAFO Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Aggregate all checked sources\nconst sources = $input.all();\nconst totalSources = sources.length;\nconst changedSources = sources.filter(s => s.json.hasChanged).length;\nconst unchangedSources = totalSources - changedSources;\n\nreturn {\n  json: {\n    totalSources,\n    changedSources,\n    unchangedSources,\n    checkTime: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })\n  }\n};"
+      },
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "chatId": "8272278534",
+        "text": "=✅ **Weekly Law Monitor Complete**\n\n**Checked:** {{ $json.totalSources }} law sources\n**Changes Detected:** {{ $json.changedSources }}\n**Unchanged:** {{ $json.unchangedSources }}\n\n**Check Time:** {{ $json.checkTime }} EST\n\n{{ $json.changedSources > 0 ? '⚠️ See individual change notifications above for details.' : '✅ All laws unchanged since last check.' }}\n\n**Next Check:** Next Monday at 6 AM EST"
+      },
+      "name": "Weekly Summary Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [1650, 400],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_TELEGRAM_CREDENTIAL_ID",
+          "name": "FAFO Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule: Monday 6 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Active Law Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Law Sources": {
+      "main": [
+        [
+          {
+            "node": "Fetch Law Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Law Content": {
+      "main": [
+        [
+          {
+            "node": "Calculate Content Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Content Hash": {
+      "main": [
+        [
+          {
+            "node": "Update Last Checked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Last Checked": {
+      "main": [
+        [
+          {
+            "node": "Check if Changed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Changed": {
+      "main": [
+        [
+          {
+            "node": "Create Change Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Change Record": {
+      "main": [
+        [
+          {
+            "node": "Notify Law Change",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Weekly Summary Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

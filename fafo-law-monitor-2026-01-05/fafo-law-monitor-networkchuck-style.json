@@ -1,0 +1,121 @@
+{
+  "name": "FAFO Law Monitor - NetworkChuck Style",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 6 * * 1"}]
+        }
+      },
+      "name": "Trigger: Monday 6 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, source_id, title, url, content_hash, target_page, target_section, priority FROM fafo_law_sources WHERE active = true ORDER BY priority DESC;"
+      },
+      "name": "Get Law Sources",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 400],
+      "credentials": {"postgres": {"id": "POSTGRES_CRED_ID", "name": "FAFO Database"}}
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {"timeout": 30000}
+      },
+      "name": "Fetch Law Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "const crypto = require('crypto');\nconst html = $input.item.json.data || $input.item.json.body || '';\nconst cleanHtml = html.replace(/\\s+/g, ' ').replace(/<!--.*?-->/g, '').trim();\nconst newHash = crypto.createHash('sha256').update(cleanHtml).digest('hex');\nconst oldHash = $input.item.json.content_hash || '';\nconst hasChanged = oldHash && newHash !== oldHash;\n\nreturn {\n  json: {\n    id: $input.item.json.id,\n    sourceId: $input.item.json.source_id,\n    title: $input.item.json.title,\n    url: $input.item.json.url,\n    targetPage: $input.item.json.target_page,\n    targetSection: $input.item.json.target_section,\n    priority: $input.item.json.priority,\n    oldHash,\n    newHash,\n    hasChanged,\n    content: cleanHtml.substring(0, 5000)\n  }\n};"
+      },
+      "name": "Calculate Hash & Detect Change",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{"value1": "={{ $json.hasChanged }}", "value2": true}]
+        }
+      },
+      "name": "IF: Law Changed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// NetworkChuck-style UUID generation\nconst uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n  const r = Math.random() * 16 | 0;\n  const v = c == 'x' ? r : (r & 0x3 | 0x8);\n  return v.toString(16);\n});\n\nreturn {\n  json: {\n    sessionId: uuid,\n    sourceId: $input.item.json.sourceId,\n    title: $input.item.json.title,\n    url: $input.item.json.url,\n    targetPage: $input.item.json.targetPage,\n    targetSection: $input.item.json.targetSection,\n    priority: $input.item.json.priority,\n    oldHash: $input.item.json.oldHash,\n    newHash: $input.item.json.newHash,\n    content: $input.item.json.content\n  }\n};"
+      },
+      "name": "Generate Session ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "password",
+        "command": "=cd /volume1/docker/home-it-department && /var/services/homes/opencode/.opencode/bin/opencode run --model opencode/grok-code \"You are a legal analyst specializing in Florida child welfare law (Chapter 39). Analyze this law change and respond with ONLY valid JSON (no markdown, no explanations):\\n\\nLaw Source: {{ $json.sourceId }}\\nTitle: {{ $json.title }}\\nOld Hash: {{ $json.oldHash }}\\nNew Hash: {{ $json.newHash }}\\nContent (first 5000 chars): {{ $json.content }}\\n\\nProvide JSON with these exact fields:\\n{\\n  \\\"summary\\\": \\\"2-3 sentence plain language summary\\\",\\n  \\\"severity\\\": \\\"minor or major\\\",\\n  \\\"affected_pages\\\": [\\\"page-names\\\"],\\n  \\\"impact_assessment\\\": \\\"5-10 sentences on family impact\\\",\\n  \\\"updated_html\\\": \\\"HTML content or null\\\",\\n  \\\"recommendations\\\": \\\"What FAFO should do\\\"\\n}\\n\\nOutput ONLY the JSON, nothing else.\"",
+        "options": {}
+      },
+      "name": "SSH: OpenCode Analysis (Grok)",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "credentials": {"sshPassword": {"id": "SSH_CRED_ID", "name": "NAS SSH (dad)"}}
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse OpenCode response (NetworkChuck style)\nconst output = $input.item.json.stdout || $input.item.json.stderr || '';\n\n// Extract JSON from output\nconst jsonMatch = output.match(/\\{[\\s\\S]*\\}/);\nif (!jsonMatch) {\n  throw new Error('No JSON found in OpenCode response');\n}\n\nconst analysis = JSON.parse(jsonMatch[0]);\n\nreturn {\n  json: {\n    sessionId: $('Generate Session ID').item.json.sessionId,\n    sourceId: $('Generate Session ID').item.json.sourceId,\n    title: $('Generate Session ID').item.json.title,\n    url: $('Generate Session ID').item.json.url,\n    targetPage: $('Generate Session ID').item.json.targetPage,\n    targetSection: $('Generate Session ID').item.json.targetSection,\n    priority: $('Generate Session ID').item.json.priority,\n    newHash: $('Generate Session ID').item.json.newHash,\n    analysis: analysis,\n    summary: analysis.summary,\n    severity: analysis.severity,\n    affectedPages: JSON.stringify(analysis.affected_pages),\n    impactAssessment: analysis.impact_assessment,\n    updatedHtml: analysis.updated_html,\n    recommendations: analysis.recommendations\n  }\n};"
+      },
+      "name": "Parse OpenCode Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO fafo_law_changes (source_id, change_type, new_content_hash, summary, severity, affected_pages, impact_assessment, updated_html, recommendations, session_id, status) VALUES ((SELECT id FROM fafo_law_sources WHERE source_id = '{{ $json.sourceId }}'), 'content_modified', '{{ $json.newHash }}', '{{ $json.summary }}', '{{ $json.severity }}', '{{ $json.affectedPages }}'::jsonb, '{{ $json.impactAssessment }}', {{ $json.updatedHtml ? \"'\" + $json.updatedHtml + \"'\" : \"NULL\" }}, '{{ $json.recommendations }}', '{{ $json.sessionId }}', 'pending_approval') RETURNING id;"
+      },
+      "name": "Save with Session ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1850, 300],
+      "credentials": {"postgres": {"id": "POSTGRES_CRED_ID", "name": "FAFO Database"}}
+    },
+    {
+      "parameters": {
+        "chatId": "8272278534",
+        "text": "=🤖 **AI Analysis Complete - NetworkChuck Style**\\n\\n**Law:** {{ $json.title }}\\n**Severity:** {{ $json.severity === 'major' ? '🔴 MAJOR' : '🟡 MINOR' }}\\n**Change ID:** #{{ $json.id }}\\n**Session:** `{{ $('Generate Session ID').item.json.sessionId }}`\\n\\n━━━━━━━━━━━━━━━━━━━━━━\\n\\n📋 **Summary:**\\n{{ $json.summary }}\\n\\n🎯 **Impact:**\\n{{ $json.impactAssessment }}\\n\\n📄 **Affected Pages:**\\n{{ $json.analysis.affected_pages.map(p => `- ${p}.html`).join('\\\\n') }}\\n\\n💡 **Recommendations:**\\n{{ $json.recommendations }}\\n\\n━━━━━━━━━━━━━━━━━━━━━━\\n\\n⚠️ **APPROVAL REQUIRED**\\n\\nReply with:\\n`/approve {{ $json.id }}` or `/deny {{ $json.id }}`\\n\\n🔗 **Details:** {{ $json.url }}\\n🤖 **AI:** Grok (OpenCode)\\n💬 **Session ID:** For follow-up questions, reference this session"
+      },
+      "name": "Telegram: Request Approval",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [2050, 300],
+      "credentials": {"telegramApi": {"id": "TELEGRAM_CRED_ID", "name": "FAFO Bot"}}
+    }
+  ],
+  "connections": {
+    "Trigger: Monday 6 AM": {"main": [[{"node": "Get Law Sources", "type": "main", "index": 0}]]},
+    "Get Law Sources": {"main": [[{"node": "Fetch Law Content", "type": "main", "index": 0}]]},
+    "Fetch Law Content": {"main": [[{"node": "Calculate Hash & Detect Change", "type": "main", "index": 0}]]},
+    "Calculate Hash & Detect Change": {"main": [[{"node": "IF: Law Changed?", "type": "main", "index": 0}]]},
+    "IF: Law Changed?": {"main": [[{"node": "Generate Session ID", "type": "main", "index": 0}], []]},
+    "Generate Session ID": {"main": [[{"node": "SSH: OpenCode Analysis (Grok)", "type": "main", "index": 0}]]},
+    "SSH: OpenCode Analysis (Grok)": {"main": [[{"node": "Parse OpenCode Response", "type": "main", "index": 0}]]},
+    "Parse OpenCode Response": {"main": [[{"node": "Save with Session ID", "type": "main", "index": 0}]]},
+    "Save with Session ID": {"main": [[{"node": "Telegram: Request Approval", "type": "main", "index": 0}]]}
+  }
+}
